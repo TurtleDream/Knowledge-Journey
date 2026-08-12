@@ -18,7 +18,7 @@ npm run build    # сборка в dist/prompt-engineering-academy
 Для деплоя на GitHub Pages:
 
 ```bash
-npm run deploy   # ng build --base-href=/<repo-name>/ && npx angular-cli-ghpages --dir=dist/prompt-engineering-academy/browser
+npm run deploy   # ng build --base-href=/Prompt-Engineering-Academy/ && npx angular-cli-ghpages --dir=dist/prompt-engineering-academy/browser
 ```
 
 Замените `<repo-name>` на имя вашего репозитория. Убедитесь, что в настройках репозитория включён GitHub Pages (ветка `gh-pages`).
