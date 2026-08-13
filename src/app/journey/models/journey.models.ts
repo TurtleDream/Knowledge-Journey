@@ -203,6 +203,8 @@ export interface LlmConfig {
   provider: 'yandex' | 'gigachat' | 'chatgpt' | 'deepseek';
   apiKey: string;
   model?: string;
+  /** Кастомный API URL (для CORS-прокси или OpenAI-совместимых эндпоинтов) */
+  apiUrl?: string;
 }
 
 /** Промпт-файлы */

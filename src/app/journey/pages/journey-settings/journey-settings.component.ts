@@ -81,6 +81,22 @@ import { LlmConfig } from '../../models/journey.models';
           </div>
         </div>
 
+        <div class="form-group">
+          <label for="apiUrl">URL CORS-прокси (необязательно, для YandexGPT и GigaChat)</label>
+          <input
+            id="apiUrl"
+            type="text"
+            [(ngModel)]="apiUrl"
+            class="api-input"
+            placeholder="https://corsproxy.io/?url=..."
+          />
+          <div class="hint">
+            Некоторые провайдеры (YandexGPT, GigaChat) блокируют прямые запросы из браузера.
+            Укажите URL прокси, например <code>https://corsproxy.io/?url=</code>,
+            чтобы обойти ограничение CORS. Для ChatGPT и DeepSeek не требуется.
+          </div>
+        </div>
+
         <div class="form-actions">
           <button class="btn btn-primary" (click)="save()">💾 Сохранить</button>
           <button class="btn btn-ghost" (click)="goBack()">← Назад</button>
@@ -189,6 +205,7 @@ export class JourneySettingsComponent implements OnInit {
   provider: 'yandex' | 'gigachat' | 'chatgpt' | 'deepseek' = 'yandex';
   apiKey = '';
   model = '';
+  apiUrl = '';
   saved = false;
 
   constructor(
@@ -202,6 +219,7 @@ export class JourneySettingsComponent implements OnInit {
       this.provider = config.provider;
       this.apiKey = config.apiKey;
       this.model = config.model ?? '';
+      this.apiUrl = config.apiUrl ?? '';
     }
   }
 
@@ -211,6 +229,7 @@ export class JourneySettingsComponent implements OnInit {
       provider: this.provider,
       apiKey: this.apiKey.trim(),
       model: this.model.trim() || undefined,
+      apiUrl: this.apiUrl.trim() || undefined,
     };
     this.llm.saveConfig(config);
     this.saved = true;

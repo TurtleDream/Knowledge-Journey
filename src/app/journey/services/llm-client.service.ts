@@ -68,6 +68,20 @@ export class LlmClientService {
         return this.parseJson<T>(raw);
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err));
+
+        // CORS/сетевые ошибки не ретраим — они не исчезнут
+        const msg = lastError.message || '';
+        const isNetworkError =
+          msg.includes('NetworkError') ||
+          msg.includes('Failed to fetch') ||
+          msg.includes('Network request failed') ||
+          msg.includes('load failed') ||
+          msg.includes('CORS');
+
+        if (isNetworkError) {
+          break;
+        }
+
         // Если это ошибка парсинга — пробуем ещё раз
         if (attempt < maxRetries - 1) {
           await this.delay(1000 * (attempt + 1));
@@ -76,8 +90,26 @@ export class LlmClientService {
     }
 
     throw new Error(
-      `Не удалось получить валидный JSON от LLM после ${maxRetries} попыток: ${lastError?.message}`
+      this.formatError(lastError, maxRetries)
     );
+  }
+
+  /** Понятное сообщение об ошибке */
+  private formatError(err: Error | null, retries: number): string {
+    if (!err) return 'Неизвестная ошибка LLM';
+    const msg = err.message;
+
+    if (
+      msg.includes('NetworkError') ||
+      msg.includes('Failed to fetch') ||
+      msg.includes('Network request failed') ||
+      msg.includes('load failed') ||
+      msg.includes('CORS')
+    ) {
+      return 'Браузер заблокировал запрос к API (CORS). Некоторые провайдеры (YandexGPT, GigaChat) не разрешают прямые запросы из браузера.\n\nРешение: укажите URL CORS-прокси в настройках или используйте ChatGPT/DeepSeek.';
+    }
+
+    return `Не удалось получить валидный JSON от LLM после ${retries} попыток: ${msg}`;
   }
 
   /** Устойчивый парсинг JSON (убирает markdown-обёртки) */
@@ -121,7 +153,15 @@ export class LlmClientService {
     const folderId = config.model?.split('/')[0] ?? '';
     const model = config.model?.split('/')[1] ?? 'yandexgpt-lite';
 
-    const url = 'https://llm.api.cloud.yandex.net/foundationModels/v1/completion';
+    // YandexGPT: если задан apiUrl — используем его как полный URL (например CORS-прокси).
+    // Иначе — стандартный эндпоинт + /completion
+    let url: string;
+    if (config.apiUrl?.trim()) {
+      url = config.apiUrl.trim();
+    } else {
+      const baseUrl = 'https://llm.api.cloud.yandex.net/foundationModels/v1';
+      url = `${baseUrl}/completion`;
+    }
     const body = {
       modelUri: `gpt://${folderId}/${model}`,
       completionOptions: {
@@ -207,6 +247,9 @@ export class LlmClientService {
     url: string,
     defaultModel: string
   ): Promise<string> {
+    // Если задан кастомный apiUrl (CORS-прокси) — используем его
+    const finalUrl = config.apiUrl?.trim() || url;
+
     const body = {
       model: config.model ?? defaultModel,
       temperature: 0.3,
@@ -217,7 +260,7 @@ export class LlmClientService {
       ],
     };
 
-    const response = await fetch(url, {
+    const response = await fetch(finalUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
