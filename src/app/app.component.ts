@@ -21,6 +21,7 @@ import { CommonModule } from '@angular/common';
             <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">Статьи</a>
             <a routerLink="/test" routerLinkActive="active">Тест</a>
             <a routerLink="/results" routerLinkActive="active">Результаты</a>
+            <a routerLink="/journey" routerLinkActive="active">Путешествие</a>
           </nav>
         </div>
       </header>
