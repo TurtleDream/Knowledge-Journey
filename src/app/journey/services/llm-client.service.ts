@@ -40,10 +40,17 @@ export class LlmClientService {
       throw new Error('API-ключ не настроен. Перейдите в настройки.');
     }
 
-    if (config.provider === 'yandex') {
-      return this.generateYandex(prompt, systemPrompt, config);
-    } else {
-      return this.generateGigachat(prompt, systemPrompt, config);
+    switch (config.provider) {
+      case 'yandex':
+        return this.generateYandex(prompt, systemPrompt, config);
+      case 'gigachat':
+        return this.generateGigachat(prompt, systemPrompt, config);
+      case 'chatgpt':
+        return this.generateOpenAICompatible(prompt, systemPrompt, config, 'https://api.openai.com/v1/chat/completions', 'gpt-4o-mini');
+      case 'deepseek':
+        return this.generateOpenAICompatible(prompt, systemPrompt, config, 'https://api.deepseek.com/chat/completions', 'deepseek-chat');
+      default:
+        throw new Error(`Неизвестный провайдер: ${config.provider}`);
     }
   }
 
@@ -188,6 +195,46 @@ export class LlmClientService {
     const result = data?.choices?.[0]?.message?.content;
     if (!result) {
       throw new Error('GigaChat вернул пустой ответ');
+    }
+    return result;
+  }
+
+  /** Запрос к OpenAI-совместимому API (ChatGPT, DeepSeek) */
+  private async generateOpenAICompatible(
+    prompt: string,
+    systemPrompt: string,
+    config: LlmConfig,
+    url: string,
+    defaultModel: string
+  ): Promise<string> {
+    const body = {
+      model: config.model ?? defaultModel,
+      temperature: 0.3,
+      max_tokens: 4000,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: prompt },
+      ],
+    };
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${config.apiKey}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`${config.provider} ошибка ${response.status}: ${errText}`);
+    }
+
+    const data = await response.json();
+    const result = data?.choices?.[0]?.message?.content;
+    if (!result) {
+      throw new Error(`${config.provider} вернул пустой ответ`);
     }
     return result;
   }

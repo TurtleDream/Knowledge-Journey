@@ -37,6 +37,22 @@ import { LlmConfig } from '../../models/journey.models';
               <span class="provider-icon">💎</span>
               <span>GigaChat</span>
             </button>
+            <button
+              class="provider-btn"
+              [class.selected]="provider === 'chatgpt'"
+              (click)="provider = 'chatgpt'"
+            >
+              <span class="provider-icon">🤖</span>
+              <span>ChatGPT</span>
+            </button>
+            <button
+              class="provider-btn"
+              [class.selected]="provider === 'deepseek'"
+              (click)="provider = 'deepseek'"
+            >
+              <span class="provider-icon">🐋</span>
+              <span>DeepSeek</span>
+            </button>
           </div>
         </div>
 
@@ -170,7 +186,7 @@ import { LlmConfig } from '../../models/journey.models';
   `]
 })
 export class JourneySettingsComponent implements OnInit {
-  provider: 'yandex' | 'gigachat' = 'yandex';
+  provider: 'yandex' | 'gigachat' | 'chatgpt' | 'deepseek' = 'yandex';
   apiKey = '';
   model = '';
   saved = false;

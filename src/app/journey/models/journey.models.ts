@@ -200,7 +200,7 @@ export interface JourneyReport {
 
 /** Конфигурация LLM */
 export interface LlmConfig {
-  provider: 'yandex' | 'gigachat';
+  provider: 'yandex' | 'gigachat' | 'chatgpt' | 'deepseek';
   apiKey: string;
   model?: string;
 }

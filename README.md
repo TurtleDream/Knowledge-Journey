@@ -122,6 +122,8 @@ npm run deploy   # ng build --base-href=/Prompt-Engineering-Academy/ && npx angu
 Поддерживаются бесплатные версии:
 - **YandexGPT** (Yandex Cloud) — API-ключ
 - **GigaChat** (Сбер) — API-ключ
+- **ChatGPT** (OpenAI) — API-ключ (модель `gpt-4o-mini` по умолчанию)
+- **DeepSeek** — API-ключ (модель `deepseek-chat` по умолчанию)
 
 Пользователь вводит API-ключ/токен в настройках (`/journey/settings`), хранится в localStorage. Никаких секретов в коде.
 
