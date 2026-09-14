@@ -15,16 +15,17 @@ export class SqliteService {
   private initPromise: Promise<void> | null = null;
   private persistTimer: ReturnType<typeof setTimeout> | null = null;
 
-  async init(): Promise<void> {
-    this.initPromise ??= this.doInit();
+  // wasmDir — относительный путь к каталогу с sql-wasm.wasm; в karma он другой
+  async init(wasmDir = 'assets/'): Promise<void> {
+    this.initPromise ??= this.doInit(wasmDir);
     return this.initPromise;
   }
 
-  private async doInit(): Promise<void> {
+  private async doInit(wasmDir: string): Promise<void> {
     let SQL: SqlJsStatic;
     try {
       SQL = await initSqlJs({
-        locateFile: (f: string) => `assets/${f}`,
+        locateFile: (f: string) => `${wasmDir}${f}`,
       });
     } catch (e) {
       throw new Error(`sql.js WASM не загрузился: ${String(e)}`);
@@ -65,6 +66,9 @@ export class SqliteService {
       CREATE TABLE IF NOT EXISTS topic_mastery (
         topic TEXT PRIMARY KEY,
         score REAL NOT NULL DEFAULT 0,
+        correct_rate REAL NOT NULL DEFAULT 0,
+        recency REAL NOT NULL DEFAULT 0,
+        coverage REAL NOT NULL DEFAULT 0,
         updated_at INTEGER
       );
       CREATE TABLE IF NOT EXISTS embeddings_cache (
@@ -86,6 +90,13 @@ export class SqliteService {
       this.db.run('ALTER TABLE chunks ADD COLUMN section TEXT');
     } catch {
       /* колонка уже есть */
+    }
+    for (const col of ['correct_rate REAL', 'recency REAL', 'coverage REAL']) {
+      try {
+        this.db.run(`ALTER TABLE topic_mastery ADD COLUMN ${col}`);
+      } catch {
+        /* колонка уже есть */
+      }
     }
   }
 

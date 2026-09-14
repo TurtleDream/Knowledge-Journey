@@ -39,7 +39,7 @@ export class EmbedderService {
       'SELECT vec FROM embeddings_cache WHERE key = ?',
       [key],
     );
-    if (cached.length > 0) return blobToVec(cached[0].vec as Uint8Array);
+    if (cached.length > 0) return blobToVec(cached[0]['vec'] as Uint8Array);
 
     const vec = await this.embedWithRetry(text);
     await this.db.run(

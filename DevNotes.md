@@ -1,5 +1,26 @@
 Журнал изменений
 
+2026-09-14 14:30 — Персональный контекст (события + агрегаты)
+
+Область:  Backend | Documentation
+
+Что изменилось:
+
+    Прикручивание сохранения персонального контекста
+
+Затронутые пути:
+
+    src/app/core/embedder.service.ts
+    src/app/core/reindex.service.ts
+    src/app/core/sqlite.service.ts
+    src/app/core/user-context.service.spec.ts
+    src/app/core/user-context.service.ts
+    src/assets/sql-wasm-browser.wasm
+
+Зачем / контекст:
+
+    Фича для персонализации
+
 2026-09-14 14:03 — RAG-поиск с бейджем «Ещё не изучено»
 
 Область:  Backend | Documentation

@@ -36,7 +36,7 @@ export class ReindexService {
       if (!force) {
         const meta = await this.db.exec(
           'SELECT hash FROM index_meta WHERE source_id = ?', [article.id]);
-        if (meta.length > 0 && meta[0].hash === h) continue;
+        if (meta.length > 0 && meta[0]['hash'] === h) continue;
       }
       total += this.chunker.chunkArticle(article).length;
     }
@@ -47,7 +47,7 @@ export class ReindexService {
       const h = await hashStr(articleContent(article));
       const meta = await this.db.exec(
         'SELECT hash FROM index_meta WHERE source_id = ?', [article.id]);
-      if (!force && meta.length > 0 && meta[0].hash === h) continue;
+      if (!force && meta.length > 0 && meta[0]['hash'] === h) continue;
       await this.reindexArticle(article, h);
     }
 
