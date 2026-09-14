@@ -81,8 +81,8 @@ export class ReindexService {
   private async saveChunk(chunk: Chunk, vec: number[]): Promise<void> {
     const [articleId, idxStr] = chunk.id.split(':');
     await this.db.run(
-      'INSERT INTO chunks (id, article_id, idx, text, studied) VALUES (?, ?, ?, ?, ?)',
-      [chunk.id, articleId, Number(idxStr), chunk.text, chunk.meta.studied ? 1 : 0],
+      'INSERT INTO chunks (id, article_id, idx, section, text, studied) VALUES (?, ?, ?, ?, ?, ?)',
+      [chunk.id, articleId, Number(idxStr), chunk.section ?? null, chunk.text, chunk.meta.studied ? 1 : 0],
     );
     await this.db.run(
       'INSERT OR REPLACE INTO embeddings (chunk_id, vec) VALUES (?, ?)',

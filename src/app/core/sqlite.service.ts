@@ -47,6 +47,7 @@ export class SqliteService {
         id TEXT PRIMARY KEY,
         article_id TEXT NOT NULL,
         idx INTEGER NOT NULL,
+        section TEXT,
         text TEXT NOT NULL,
         studied INTEGER NOT NULL DEFAULT 0,
         UNIQUE(article_id, idx)
@@ -78,6 +79,11 @@ export class SqliteService {
     // для БД, созданных до появления studied — ALTER молча падает на свежих
     try {
       this.db.run('ALTER TABLE chunks ADD COLUMN studied INTEGER NOT NULL DEFAULT 0');
+    } catch {
+      /* колонка уже есть */
+    }
+    try {
+      this.db.run('ALTER TABLE chunks ADD COLUMN section TEXT');
     } catch {
       /* колонка уже есть */
     }

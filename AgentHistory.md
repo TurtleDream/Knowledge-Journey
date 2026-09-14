@@ -88,3 +88,27 @@ __`src/app/core/reindex.service.ts`:__
 __UI__ (`journey-settings.component.ts`): блок «Индекс знаний» с кнопкой «⟳ Обновить индекс»; во время работы — `Индексация N / M…` и disabled, после — «X чанков за Y мс». Перед запуском вызывает `sqlite.init()`.
 
 __Нюанс:__ journeys в `reindexAll` сейчас не участвуют — `chunkAll` их принимает, но journeys генерятся в рантайме и не лежат в константах; когда появится хранилище сгенерированных journeys, добавлю их во второй цикл тем же паттерном (хеш по `JSON.stringify(journey)`).
+
+Готово, компилируется и тесты зелёные.
+
+__`src/app/core/prompts/rag.prompts.ts`__ — по образцу `journey/prompts/`:
+
+- `RAG_SYSTEM_PROMPT` — «Отвечай ТОЛЬКО на основе контекста… Если контекста мало — добавь пометку [ОБЩИЕ ЗНАНИЯ] и ответь из своих знаний» + требование ссылаться на чанки `[N]`.
+- `buildRagPrompt(question, chunks)` — пронумерованный контекст `[1]…[N]` + вопрос.
+
+__`src/app/core/rag.service.ts`__:
+
+- Пайплайн `ask()`:
+
+  1. `embedder.embed(question)` → все векторы из SQLite одним JOIN-запросом (сотни-тысячи строк для frontend-only — в память ок).
+  2. Cosine similarity, top-K = 5; `studied = 0` → `source.unstudied = true`.
+  3. `includeUnstudied = false` и все top-K не изучены → `{ needsUnstudiedConfirm: true, sources }` — тип результата поэтому union (`RagResult`).
+  4. `llm.generate(prompt, system)` — штатный клиент (Yandex/GigaChat/ChatGPT/DeepSeek).
+  5. Парсинг `[N]` → `source.cited = true` у использованных чанков. Регэксп `[(\d+)]` с проверкой границ — модель любит несуществующие номера.
+  6. `origin`: ищем `[ОБЩИЕ ЗНАНИЯ]` case-insensitive (модель может вернуть `[Общие знания]`), пометку из текста ответа убираю.
+
+- Пустой индекс → честный `origin: 'general'` с пустым answer (пока без fallback-генерации — FIXME, если нужно).
+
+__Сопутствующая правка схемы__: в `chunks` добавлена колонка `section TEXT` (CREATE + guarded ALTER для существующих БД), `ReindexService.saveChunk` теперь её пишет — она нужна источникам, чтобы в UI показывать «Из статьи X → раздел Y».
+
+__Замечание:__ цитаты `[N]` после парсинга остаются в тексте ответа — чистить их при рендере (например, подсветить как ссылки) решать UI-компоненту.

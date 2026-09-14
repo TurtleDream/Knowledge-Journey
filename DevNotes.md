@@ -1,5 +1,24 @@
 Журнал изменений
 
+2026-09-14 14:03 — RAG-поиск с бейджем «Ещё не изучено»
+
+Область:  Backend | Documentation
+
+Что изменилось:
+
+    Функционал для поиска по изученным знаниям
+
+Затронутые пути:
+
+    src/app/core/rag.service.ts
+    src/app/core/reindex.service.ts
+    src/app/core/sqlite.service.ts
+    src/app/core/prompts/rag.prompts.ts
+
+Зачем / контекст:
+
+    Формирование основы для RAG
+
 2026-09-14 13:57 —  Индексация + reindex
 
 Область:  Backend | Documentation
