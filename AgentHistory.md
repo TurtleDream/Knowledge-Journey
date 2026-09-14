@@ -177,3 +177,19 @@ __`src/app/core/progress-analyzer.service.ts`__ — `analyze(userGoal?)`:
 __UI__ — `journey/components/progress-analyzer/progress-analyzer.component.ts`: кнопка «🔍 Анализ прогресса» в journey-settings (рядом с «Обновить индекс»); модалка в стиле проекта (тёмная, золотые акценты): summary → карточки по темам (тема, reason «как мешает цели», список 📖 статей) → «Закрыть»; клик по оверлею тоже закрывает; ошибка LLM показывается внутри модалки, не падает в консоль молча.
 
 __Замечание:__ тема для `rag.search` — это имя из агрегатов, т.е. то, чем юзер (или твой код) пометил topicId в `trackEvent`. Если там сырые id вроде `tokens`, retrieval будет искать по ним — работает, но лучше человеческие названия тем.
+
+
+__`src/app/core/prompts/recommender.prompts.ts`:__
+
+- `RECOMMENDER_SYSTEM_PROMPT` — навигатор, только JSON;
+- `buildRecommenderPrompt(studied, currentJourney, goal?)` — на вход изученные темы с mastery, заголовок активного journey (или пометка, что journeys нет), цель. В требовании зафиксировано: не предлагать усвоенное (mastery > 0.7), nextTopics = 3, relatedSkills = 2–3 смежных навыка, resumeSuggestion только при mastery > 0.6 хотя бы по двум темам (иначе null). Жёсткий пример JSON.
+
+__`src/app/core/recommender.service.ts`:__
+
+- `recommendNext(userGoal?)`:
+
+  1. Изученные темы — из `UserContextService.getAggregates()` (topic + score), текущий journey — из `JourneyStateService.journey()` (заголовок идёт в промпт).
+  2. Один вызов `llm.generateJson` (штатные ретраи) — сразу nextTopics + relatedSkills + resumeSuggestion.
+  3. Для каждой next-topic — `rag.search(topic, 2)` параллельно, статьи дедупятся и мапятся на заголовки из `ARTICLES`.
+
+- `suggestResumeSkills(studiedTopics)`: принимает список тем, сверяет с агрегатами (нет данных → mastery 0.5 по умолчанию), один LLM-вызов, на выходе строки строго в формате «На основе изученного: добавьте навык X в резюме, потому что …
