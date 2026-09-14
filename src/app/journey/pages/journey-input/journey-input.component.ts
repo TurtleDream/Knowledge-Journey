@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { JourneyGeneratorService } from '../../services/journey-generator.service';
 import { LlmClientService } from '../../services/llm-client.service';
 import { JourneyStateService } from '../../services/journey-state.service';
@@ -10,7 +10,7 @@ import { Difficulty, NarrativeMode } from '../../models/journey.models';
 @Component({
   selector: 'app-journey-input',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterLink],
   template: `
     <div class="journey-input">
       <div class="input-panel panel">
@@ -76,6 +76,15 @@ import { Difficulty, NarrativeMode } from '../../models/journey.models';
         <div class="error-box" *ngIf="error">
           <span class="error-icon">⚠</span>
           <span>{{ error }}</span>
+        </div>
+
+        <div class="need-study" *ngIf="needStudy?.length">
+          <p>Изученного материала по теме пока мало. Сначала пройди:</p>
+          <ul>
+            <li *ngFor="let a of needStudy">
+              <a [routerLink]="a.url">📖 {{ a.title }}</a>
+            </li>
+          </ul>
         </div>
 
         <div class="loading-box" *ngIf="loading">
@@ -266,13 +275,18 @@ export class JourneyInputComponent {
     this.loadingMessage = 'Выделяю концепции...';
 
     try {
-      const journey = await this.generator.generateJourney({
+      const res = await this.generator.generateJourney({
         topic: this.topic.trim(),
         narrativeMode: this.narrativeMode,
         difficulty: this.difficulty,
       });
 
-      this.stateService.startJourney(journey);
+      if (res.status === 'need-study') {
+        this.needStudy = res.articles;
+        return;
+      }
+
+      this.stateService.startJourney(res.journey);
       this.router.navigate(['/journey/map']);
     } catch (err) {
       this.error = err instanceof Error ? err.message : 'Ошибка генерации';
@@ -284,4 +298,7 @@ export class JourneyInputComponent {
   openSettings(): void {
     this.router.navigate(['/journey/settings']);
   }
+
+  // изученного мало — список статей, которые стоит пройти сначала
+  needStudy: { title: string; url: string; section?: string }[] | null = null;
 }

@@ -86,8 +86,13 @@ export class RagService {
     };
   }
 
-  // чистый retrieval без LLM — для анализатора прогресса
-  async search(query: string, k = 3): Promise<Source[]> {
+  // чистый retrieval без LLM — для анализатора и генератора journey
+  // onlyStudied — только чанки, помеченные studied (markStudied)
+  async search(
+    query: string,
+    k = 3,
+    opts: { onlyStudied?: boolean } = {},
+  ): Promise<Source[]> {
     const qvec = await this.embedder.embed(query);
 
     const rows = await this.db.exec(`
@@ -99,7 +104,8 @@ export class RagService {
       .map((r) => ({ r, score: cosine(qvec, blobToVec(r['vec'] as Uint8Array)) }))
       .sort((a, b) => b.score - a.score)
       .slice(0, k)
-      .map((s) => toSource(s.r, s.score));
+      .map((s) => toSource(s.r, s.score))
+      .filter((s) => (opts.onlyStudied ? !s.unstudied : true));
   }
 
   // citations [N] в ответе могут указывать на чанки, которые модель взяла

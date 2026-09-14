@@ -103,6 +103,13 @@ export interface Journey {
   concepts: Concept[];
   checkpoints: Checkpoint[];
   createdAt: string;
+  /** journey сгенерирован на основе изученных материалов платформы */
+  origin?: 'ai';
+  /** источники под каждым чекпоинтом (chunk_id → url) */
+  sources?: {
+    checkpointId: string;
+    refs: { chunkId: string; url: string; section?: string }[];
+  }[];
 }
 
 /** Результат активности */

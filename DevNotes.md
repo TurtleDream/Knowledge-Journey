@@ -1,5 +1,26 @@
 Журнал изменений
 
+2026-09-14 15:47 — v 3.0.4 Генератор Journey через RAG
+
+Область:  Frontend | Documentation
+
+Что изменилось:
+
+    Добавлен механизм генерации путешествия используя пройденные темы (изученный контент)
+
+Затронутые пути:
+
+    src/app/journey/services/journey-generator.service.ts
+    src/app/journey/prompts/journey-rag.prompts.ts
+    src/app/journey/pages/journey-input/journey-input.component.ts
+    src/app/journey/models/journey.models.ts
+    src/app/core/rag.service.ts
+
+Зачем / контекст:
+
+    Для улучшения закрепления на основе изученного
+
+
 2026-09-14 15:32 — v 3.0.3 Рекомендатор следующих шагов
 
 Область:  Frontend | Documentation

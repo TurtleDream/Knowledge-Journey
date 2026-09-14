@@ -193,3 +193,22 @@ __`src/app/core/recommender.service.ts`:__
   3. Для каждой next-topic — `rag.search(topic, 2)` параллельно, статьи дедупятся и мапятся на заголовки из `ARTICLES`.
 
 - `suggestResumeSkills(studiedTopics)`: принимает список тем, сверяет с агрегатами (нет данных → mastery 0.5 по умолчанию), один LLM-вызов, на выходе строки строго в формате «На основе изученного: добавьте навык X в резюме, потому что …
+
+__`src/app/journey/prompts/journey-rag.prompts.ts`:__
+
+- `RAG_JOURNEY_HINT` — «Используй материалы платформы… строго в их терминах, не выдумывай факты»;
+- `MIN_STUDIED_SOURCES = 3` — порог «изученного мало»;
+- `buildContextBlock(sources)` — пронумерованные чанки с секциями;
+- `toSourceRef` — `chunk_id → url` (`/article/<articleId>`, маршрут есть в app.routes) + `section`.
+
+__`RagService.search`__ — третий параметр `opts.onlyStudied`: фильтр по `studied` __после__ сортировки (иначе порог top-k откусит релевантные неучёные чанки).
+
+__`JourneyGeneratorService`__:
+
+- Пайплайн: `search(topic, 10, {onlyStudied: true})` → если `< 3` чанков, генерация не запускается, а второй поиск (уже без фильтра, топ-5) формирует список «сначала изучить». Порог проверяется до LLM — ключ не тратится.
+- Контекст (hint + блок чанков) добавляется к промптам концепций и чекпоинтов; активности — без блока (генерятся на базе чекпоинта, там контекст не нужен).
+- Возвращаемый тип — union `JourneyGeneration`: `{status:'ok', journey}` | `{status:'need-study', articles}`.
+- `origin: 'ai'` проставляется в journey при сохранении (поле добавлено в модель `Journey`, опциональное — старые journeys из localStorage валидны).
+- `journey.sources[]` — на каждый чекпоинт: retrieval по `cp.concept` среди изученных (3 релевантных, дедуп по chunkId); если по концепции пусто — fallback: первые 3 чанка общего контекста.
+
+__`journey-input`__: обрабатывает `need-study` — блок «Изученного материала по теме пока мало. Сначала пройди:» со ссылками (RouterLink) на страницы статей.

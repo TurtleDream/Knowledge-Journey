@@ -6,6 +6,7 @@
 
 import { Injectable } from '@angular/core';
 import { LlmClientService } from './llm-client.service';
+import { RagService } from '../../core/rag.service';
 import {
   Activity,
   Checkpoint,
@@ -21,18 +22,50 @@ import {
   buildCheckpointsPrompt,
   buildConceptsPrompt,
 } from '../prompts/journey.prompts';
+import {
+  MIN_STUDIED_SOURCES,
+  RAG_JOURNEY_HINT,
+  JourneySourceRef,
+  buildContextBlock,
+  toSourceRef,
+} from '../prompts/journey-rag.prompts';
+import { Source } from '../../core/rag.service';
+
+export type JourneyGeneration =
+  | { status: 'ok'; journey: Journey }
+  | { status: 'need-study'; articles: { title: string; url: string; section?: string }[] };
 
 @Injectable({ providedIn: 'root' })
 export class JourneyGeneratorService {
-  constructor(private llm: LlmClientService) {}
+  constructor(
+    private llm: LlmClientService,
+    private rag: RagService,
+  ) {}
 
-  /** Полная генерация journey */
-  async generateJourney(request: JourneyRequest): Promise<Journey> {
+  /** Полная генерация journey на основе изученных материалов */
+  async generateJourney(request: JourneyRequest): Promise<JourneyGeneration> {
+    const sources = await this.rag.search(request.topic, 10, { onlyStudied: true });
+
+    // изученного мало — сначала материалы
+    if (sources.length < MIN_STUDIED_SOURCES) {
+      const toStudy = await this.rag.search(request.topic, 5);
+      return {
+        status: 'need-study',
+        articles: toStudy.map((s) => ({
+          title: s.section ?? s.chunkId,
+          url: `/article/${s.articleId}`,
+          section: s.section,
+        })),
+      };
+    }
+
+    const contextBlock = buildContextBlock(sources);
+
     // Шаг 1: концепции
-    const concepts = await this.generateConcepts(request);
+    const concepts = await this.generateConcepts(request, contextBlock);
 
     // Шаг 2: чекпоинты
-    const checkpoints = await this.generateCheckpoints(request, concepts);
+    const checkpoints = await this.generateCheckpoints(request, concepts, contextBlock);
 
     // Шаг 3: активности для каждого чекпоинта
     const fullCheckpoints: Checkpoint[] = [];
@@ -40,6 +73,19 @@ export class JourneyGeneratorService {
       const activities = await this.generateActivities(cp, request.difficulty, checkpoints.length);
       fullCheckpoints.push({ ...cp, activities });
     }
+
+    // источники под каждым чекпоинтом: по концепции чекпоинта ищем изученные чанки
+    const cpSources = await Promise.all(
+      fullCheckpoints.map(async (cp) => {
+        const hits = await this.rag.search(cp.concept, 3, { onlyStudied: true });
+        return { checkpointId: cp.id, refs: dedupeRefs(hits.map(toSourceRef)) };
+      }),
+    );
+    // если по концепции ничего — делим общий контекст между чекпоинтами
+    const fallbackRefs = dedupeRefs(sources.map(toSourceRef));
+    const journeySources = cpSources.map((s) =>
+      s.refs.length > 0 ? s : { checkpointId: s.checkpointId, refs: fallbackRefs.slice(0, 3) },
+    );
 
     // Проверяем, что есть хотя бы один BC
     const hasBattle = fullCheckpoints.some((cp) =>
@@ -60,18 +106,20 @@ export class JourneyGeneratorService {
       concepts,
       checkpoints: fullCheckpoints,
       createdAt: new Date().toISOString(),
+      origin: 'ai',
+      sources: journeySources,
     };
 
-    return journey;
+    return { status: 'ok', journey };
   }
 
   /** Шаг 1: генерация концепций */
-  private async generateConcepts(request: JourneyRequest): Promise<Concept[]> {
-    const prompt = buildConceptsPrompt(
+  private async generateConcepts(request: JourneyRequest, contextBlock: string): Promise<Concept[]> {
+    const prompt = `${buildConceptsPrompt(
       request.topic,
       request.narrativeMode,
       request.difficulty
-    );
+    )}\n\n${RAG_JOURNEY_HINT}\n\n${contextBlock}`;
     const concepts = await this.llm.generateJson<Concept[]>(prompt, SYSTEM_PROMPT);
 
     // Валидация
@@ -90,14 +138,15 @@ export class JourneyGeneratorService {
   /** Шаг 2: генерация чекпоинтов */
   private async generateCheckpoints(
     request: JourneyRequest,
-    concepts: Concept[]
+    concepts: Concept[],
+    contextBlock: string
   ): Promise<Checkpoint[]> {
-    const prompt = buildCheckpointsPrompt(
+    const prompt = `${buildCheckpointsPrompt(
       request.topic,
       request.narrativeMode,
       request.difficulty,
       JSON.stringify(concepts)
-    );
+    )}\n\n${RAG_JOURNEY_HINT}\n\n${contextBlock}`;
     const checkpoints = await this.llm.generateJson<Checkpoint[]>(prompt, SYSTEM_PROMPT);
 
     // Валидация
@@ -205,4 +254,13 @@ export class JourneyGeneratorService {
   private generateId(): string {
     return 'j_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
   }
+}
+
+function dedupeRefs(refs: JourneySourceRef[]): JourneySourceRef[] {
+  const seen = new Set<string>();
+  return refs.filter((r) => {
+    if (seen.has(r.chunkId)) return false;
+    seen.add(r.chunkId);
+    return true;
+  });
 }
