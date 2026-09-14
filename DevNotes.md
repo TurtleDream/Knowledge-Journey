@@ -1,5 +1,32 @@
 Журнал изменений
 
+2026-09-14 15:14 — v 3.0.1 Разделил Бэк и фронт
+
+Область:  Backend | Frontend | Documentation
+
+Что изменилось:
+
+    Разделил Бэк и фронт
+    Добавили settings.json
+
+Затронутые пути:
+
+    src/app/journey/services/llm-client.service.ts
+    src/app/core/settings.service.ts
+    src/app/core/reindex.service.ts
+    src/app/core/embedding-provider.ts
+    src/app/core/embedder.service.ts
+    server/settings.example.json
+    server/index.js
+    proxy.conf.json
+    package.json
+    package-lock.json
+    angular.json
+
+Зачем / контекст:
+
+    Поддержка чистоты кода
+
 2026-09-14 14:30 — Персональный контекст (события + агрегаты)
 
 Область:  Backend | Documentation

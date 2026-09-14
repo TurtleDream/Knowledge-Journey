@@ -1,0 +1,16 @@
+{
+  "port": 3000,
+  "llm": {
+    "provider": "yandex",
+    "apiKey": "ВАШ_КЛЮЧ",
+    "folderId": "ВАШ_FOLDER_ID",
+    "model": "yandexgpt-lite",
+    "apiUrl": ""
+  },
+  "embeddings": {
+    "apiKey": "API_КЛЮЧ_СА_ИЛИ_ПУСТО",
+    "iamToken": "ИЛИ_IAM_ТОКЕН",
+    "folderId": "ВАШ_FOLDER_ID",
+    "kind": "doc"
+  }
+}

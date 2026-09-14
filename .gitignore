@@ -41,3 +41,6 @@ typings
 # System files
 .DS_Store
 Thumbs.db
+
+# бэкенд: настройки с ключами в git не попадают
+server/settings.json

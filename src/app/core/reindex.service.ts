@@ -28,6 +28,7 @@ export class ReindexService {
   ) {}
 
   async reindexAll(force = false): Promise<{ chunks: number; time: number }> {
+    await this.embedder.autoConfigure();
     const t0 = performance.now();
     let total = 0;
 

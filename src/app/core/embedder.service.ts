@@ -1,7 +1,8 @@
 import { Injectable } from '@angular/core';
 
 import { SqliteService } from './sqlite.service';
-import { EmbeddingProvider, YandexEmbeddingProvider } from './embedding-provider';
+import { SettingsService } from './settings.service';
+import { EmbeddingProvider, BackendEmbeddingProvider, YandexEmbeddingProvider } from './embedding-provider';
 
 const MAX_BATCH = 50;
 const PARALLEL = 4; // одновременных запросов к API
@@ -31,7 +32,19 @@ export class EmbedderService {
     this.provider = p;
   }
 
-  constructor(private db: SqliteService) {}
+  constructor(
+    private db: SqliteService,
+    private settings: SettingsService,
+  ) {}
+
+  // если поднят локальный бэкенд с настройками — эмбеддинги идут через него,
+  // ключи остаются в server/settings.json. Прямые провайдеры — фолбэк.
+  async autoConfigure(): Promise<void> {
+    const cfg = await this.settings.load();
+    if (cfg?.embeddings?.iamToken) {
+      this.provider = new BackendEmbeddingProvider();
+    }
+  }
 
   async embed(text: string): Promise<number[]> {
     const key = await sha256(text);
@@ -54,6 +67,11 @@ export class EmbedderService {
   async embedBatch(texts: string[]): Promise<number[][]> {
     if (texts.length > MAX_BATCH) {
       throw new Error(`батч больше ${MAX_BATCH} текстов, режьте наверху`);
+    }
+    // если провайдер умеет батч одним запросом (бэкенд) — один вызов,
+    // иначе пул воркеров по одиночным embed
+    if (this.provider.embedBatch) {
+      return this.provider.embedBatch(texts);
     }
     const res: number[][] = new Array(texts.length);
     let next = 0;

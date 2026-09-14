@@ -6,12 +6,16 @@
  */
 
 import { Injectable } from '@angular/core';
+
+import { SettingsService } from '../../core/settings.service';
 import { LlmConfig } from '../models/journey.models';
 
 const CONFIG_KEY = 'kj-llm-config';
 
 @Injectable({ providedIn: 'root' })
 export class LlmClientService {
+  constructor(private settings: SettingsService) {}
+
   /** Сохранить конфигурацию LLM */
   saveConfig(config: LlmConfig): void {
     localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
@@ -35,9 +39,27 @@ export class LlmClientService {
 
   /** Отправить запрос к LLM и получить текст ответа */
   async generate(prompt: string, systemPrompt: string): Promise<string> {
+    // сначала пробуем локальный бэкенд — ключи не светятся в браузере
+    const cfg = await this.settings.load();
+    if (cfg?.llm?.apiKey) {
+      const res = await fetch('/api/llm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, systemPrompt }),
+      });
+      if (res.ok) {
+        const json = (await res.json()) as { text: string };
+        return json.text;
+      }
+      // бэкенд есть, но запрос упал — не молча откатываемся на localStorage,
+      // ошибка настроек файла важнее
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error ?? `backend llm error ${res.status}`);
+    }
+
     const config = this.getConfig();
     if (!config?.apiKey) {
-      throw new Error('API-ключ не настроен. Перейдите в настройки.');
+      throw new Error('API-ключ не настроен. Перейдите в настройки или запустите бэкенд (node server/index.js).');
     }
 
     switch (config.provider) {

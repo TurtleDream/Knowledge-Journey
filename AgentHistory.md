@@ -130,3 +130,32 @@ __Формула `score = 0.6 * correct_rate + 0.2 * recency + 0.2 * coverage` �
 2. __recency 0.2__ — экспоненциальный распад: `0.5^(Δt / 24ч)`, сутки = полураспад. Малый вес обоснован: свежесть показывает, что данные актуальны, но сама по себе не про знание — ученик, вернувшийся через неделю, не «отупел» на 0.6. Поэтому recency только слегка подмешивается, а не давит.
 3. __coverage 0.2__ — `min(1, answered / 10)`. Защита от самообмана при малой выборке: 1 правильный ответ из 1 даёт correct_rate = 1.0, но mastery не должна быть максимальной. Coverage сдерживает score, пока на тему мало данных. 10 — условная «полная тема» (у нас тест из 12 вопросов, inline-упражнений на тему ~2–4, 10 = несколько сессий).
 4. Сумма весов = 1, все компоненты в [0,1] — score интерпретируем как вероятность/уровень, легко сравнивать темы между собой.
+
+
+## Бэкенд (`server/`)
+
+__`server/index.js`__ — Node + Express + cors (поставлены в dependencies), ~150 строк:
+
+- __`GET /api/config`__ — отдаёт содержимое `server/settings.json`. Файл читается на каждый запрос — правки подхватываются без рестарта.
+- __`POST /api/llm`__ `{ prompt, systemPrompt }` → `{ text }` — прокси к YandexGPT / GigaChat / ChatGPT / DeepSeek, ключ берётся из файла, в браузер не попадает.
+- __`POST /api/embeddings`__ `{ texts: string[] }` → `{ embeddings: number[][] }` — прокси к Yandex text-embedding (по одному тексту, doc/query из настроек).
+- __`GET /api/health`__ + раздача статики из `server/dist` (продовый вариант: `ng build` → результат туда, один процесс на всё).
+- Порт из `settings.json` (по умолчанию 3000).
+
+__Настройки в файле:__
+
+- `server/settings.json` — реальные ключи, __в .gitignore__.
+- `server/settings.example.json` — шаблон: `port`, `llm {provider, apiKey, model, apiUrl}`, `embeddings {iamToken, folderId, kind}`.
+
+```bash
+cp server/settings.example.json server/settings.json  # вписать ключи
+node server/index.js
+```
+
+## Фронтенд
+
+- __`settings.service.ts`__ — `load()`: один fetch `/api/config`, кэшируется; бэкенд не поднят → `null`, приложение работает как раньше.
+- __`LlmClientService.generate`__ — сначала бэкенд. Важно: если бэкенд ответил ошибкой (невалидный ключ в файле), она __пробрасывается__, а не глушится фолбэком на localStorage. Фолбэк на localStorage только если бэкенда нет вообще (`/api/config` → 404/сеть).
+- __`EmbedderService.autoConfigure()`__ (вызывается из `reindexAll`) — есть конфиг эмбеддингов → переключается на `BackendEmbeddingProvider`. В интерфейсе `EmbeddingProvider` появился опциональный `embedBatch` — бэкенд умеет батч одним запросом, и `embedBatch()` идёт одним POST вместо пула из 4 воркеров.
+- __`proxy.conf.json`__ + `angular.json serve.options.proxyConfig` — при `ng serve` запросы `/api/*` идут на `localhost:3000` без CORS-боли.
+- Прямые провайдеры (`YandexEmbeddingProvider`, `OpenAIEmbeddingProvider`) остались — мобильный сценарий без бэкенда не сломан.

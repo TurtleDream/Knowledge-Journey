@@ -2,6 +2,30 @@
 // на OpenAI, достаточно реализовать этот интерфейс и подсунуть в EmbedderService.
 export interface EmbeddingProvider {
   embed(text: string): Promise<number[]>;
+  /** провайдер может уметь батч одним запросом — тогда EmbedderService использует его */
+  embedBatch?(texts: string[]): Promise<number[][]>;
+}
+
+// все запросы идут через локальный бэкенд — ключи только в server/settings.json
+export class BackendEmbeddingProvider implements EmbeddingProvider {
+  async embed(text: string): Promise<number[]> {
+    return (await this.embedBatch([text]))[0];
+  }
+
+  async embedBatch(texts: string[]): Promise<number[][]> {
+    const res = await fetch('/api/embeddings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ texts }),
+    });
+    if (!res.ok) {
+      throw Object.assign(new Error(`backend embedding failed: ${res.status}`), {
+        status: res.status,
+      });
+    }
+    const json = (await res.json()) as { embeddings: number[][] };
+    return json.embeddings;
+  }
 }
 
 // ВАЖНО: frontend-only — ключ светится в браузере. Для прода нужен proxy,
