@@ -42,3 +42,49 @@ __Тест__ — `content-chunker.service.spec.ts`, чистый jasmine без 
 → 3 чанка абзацев + 1 чанк упражнения (`id: 'how-llms-work:3'`, `section: 'Токенизация...'`).
 
 Нюанс: для запуска тестов локально Chrome не установлен — запускал через `CHROME_BIN=msedge`. Если захочешь зафиксировать, можно прописать `process.env.CHROME_BIN` в `karma.conf` / `test.ts`.
+
+
+Компилируется, существующие тесты зелёные.
+
+__API YandexGPT (проверил — актуально):__
+
+- Endpoint: `POST https://llm.api.cloud.yandex.net/foundation-models/v1/text-embedding`
+- Тело: `{ "modelUri": "emb://<folderId>/text-search-doc", "text": "..." }`, ответ `{ "embedding": [...] }`
+- Модели: `text-search-doc` для документов, `text-search-query` для поисковых запросов — их __нельзя смешивать__ (вектора в разных пространствах), поэтому в провайдере флаг `kind: 'doc' | 'query'`.
+
+__Файлы:__
+
+1. __`src/app/core/embedding-provider.ts`__ — абстракция:
+
+   - `EmbeddingProvider` — интерфейс с одним `embed(text): Promise<number[]>`.
+   - `YandexEmbeddingProvider` — реализация выше.
+   - `OpenAIEmbeddingProvider` — уже набросан (`/v1/embeddings`, `text-embedding-3-small`), переключение = `embedder.setProvider(new OpenAIEmbeddingProvider(key))`.
+
+2. __`src/app/core/embedder.service.ts`__:
+
+   - `embed(text)`: SHA-256 через `crypto.subtle` → lookup в `embeddings_cache` (вектор хранится как BLOB — `Float32Array` байты, при чтении разворачивается обратно). Промах → запрос → `INSERT OR REPLACE` (persist в IndexedDB debounce'ится самим `SqliteService`).
+   - `embedBatch(texts)`: лимит 50 (больше — ошибка, резать наверху), ограничение параллелизма 4 воркера.
+   - `embedWithRetry`: retry только на 429/5xx, до 3 попыток, backoff 500ms → 1s → 2s.
+
+__Два честных замечания:__
+
+- «max 50 текстов за запрос» для Яндекса физически не существует — их API принимает один текст на вызов. Батчинг реализован как пачка из ≤50 текстов с семафором. Если потом перейдёте на OpenAI, там батч возможен в одном запросе — можно будет переопределить в провайдере (добавить опциональный `embedBatch` в интерфейс).
+- Frontend-only: IAM-токен/ключ лежит в браузере и виден любому. Для реального ключа нужен прокси; в коде это помечено комментарием, токен пока заглушка.
+
+
+__Изменения схемы__ (`sqlite.service.ts`, миграция идемпотентна):
+
+- `chunks.id` → `TEXT PRIMARY KEY` (формат `articleId:idx`), добавлена колонка `studied INTEGER DEFAULT 0` (+ guarded `ALTER TABLE` для старых БД).
+- `embeddings.chunk_id` → `TEXT` (ссылается на текстовый id чанка).
+- Новая таблица `index_meta(source_id, hash)` — хеш контента статьи для инкрементальности.
+
+__`src/app/core/reindex.service.ts`:__
+
+- `reindexAll(force = false)` — считает SHA-256 от `JSON.stringify(article.sections)` каждой статьи; если хеш совпал со сохранённым — статья пропускается целиком (ни эмбеддингов, ни записи). Прогресс в `signal<{done,total}>` — `total` считается только по реально переиндексируемым статьям. Возвращает `{chunks, time}`.
+- `reindexArticle(article, hash?)` — DELETE старых чанков/векторов статьи (`LIKE 'articleId:%'`), батчи по 50 через `embedBatch`, запись `chunks` + `embeddings` (вектор — BLOB из `Float32Array`), обновление хеша в `index_meta`. `idx` мог поехать после правки текста, поэтому полная замена, а не UPSERT.
+- `markStudied(articleId)` — `UPDATE chunks SET studied = 1`. Эмбеддинги не пересчитываются: текст не менялся, кэш по хешу и так валиден.
+- Прогресс — Angular `signal`, обновляется после каждого чанка (батчами по 50), компонент подписан через `progress()` в шаблоне.
+
+__UI__ (`journey-settings.component.ts`): блок «Индекс знаний» с кнопкой «⟳ Обновить индекс»; во время работы — `Индексация N / M…` и disabled, после — «X чанков за Y мс». Перед запуском вызывает `sqlite.init()`.
+
+__Нюанс:__ journeys в `reindexAll` сейчас не участвуют — `chunkAll` их принимает, но journeys генерятся в рантайме и не лежат в константах; когда появится хранилище сгенерированных journeys, добавлю их во второй цикл тем же паттерном (хеш по `JSON.stringify(journey)`).

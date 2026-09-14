@@ -1,9 +1,11 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { LlmClientService } from '../../services/llm-client.service';
 import { LlmConfig } from '../../models/journey.models';
+import { SqliteService } from '../../../core/sqlite.service';
+import { ReindexService } from '../../../core/reindex.service';
 
 @Component({
   selector: 'app-journey-settings',
@@ -94,6 +96,19 @@ import { LlmConfig } from '../../models/journey.models';
             Некоторые провайдеры (YandexGPT, GigaChat) блокируют прямые запросы из браузера.
             Укажите URL прокси, например <code>https://corsproxy.io/?url=</code>,
             чтобы обойти ограничение CORS. Для ChatGPT и DeepSeek не требуется.
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Индекс знаний</label>
+          <button class="provider-btn selected reindex-btn" (click)="reindex()" [disabled]="reindexing()">
+            <span *ngIf="!reindexing()">⟳ Обновить индекс</span>
+            <span *ngIf="reindexing()">
+              Индексация {{ progress()!.done }} / {{ progress()!.total }}…
+            </span>
+          </button>
+          <div class="hint" *ngIf="reindexed">
+            {{ reindexed.chunks }} чанков за {{ reindexed.time }} мс
           </div>
         </div>
 
@@ -210,8 +225,30 @@ export class JourneySettingsComponent implements OnInit {
 
   constructor(
     private llm: LlmClientService,
-    private router: Router
+    private router: Router,
+    private sqlite: SqliteService,
+    public reindexSvc: ReindexService,
   ) {}
+
+  reindexing = signal(false);
+  reindexed: { chunks: number; time: number } | null = null;
+
+  progress(): { done: number; total: number } | null {
+    return this.reindexSvc.progress();
+  }
+
+  async reindex(): Promise<void> {
+    this.reindexing.set(true);
+    this.reindexed = null;
+    try {
+      await this.sqlite.init();
+      this.reindexed = await this.reindexSvc.reindexAll();
+    } catch (e) {
+      console.error('reindex failed', e);
+    } finally {
+      this.reindexing.set(false);
+    }
+  }
 
   ngOnInit(): void {
     const config = this.llm.getConfig();

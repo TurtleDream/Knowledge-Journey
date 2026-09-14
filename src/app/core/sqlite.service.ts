@@ -44,14 +44,15 @@ export class SqliteService {
     if (!this.db) throw new Error('db not open');
     this.db.run(`
       CREATE TABLE IF NOT EXISTS chunks (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id TEXT PRIMARY KEY,
         article_id TEXT NOT NULL,
         idx INTEGER NOT NULL,
         text TEXT NOT NULL,
+        studied INTEGER NOT NULL DEFAULT 0,
         UNIQUE(article_id, idx)
       );
       CREATE TABLE IF NOT EXISTS embeddings (
-        chunk_id INTEGER PRIMARY KEY REFERENCES chunks(id),
+        chunk_id TEXT PRIMARY KEY REFERENCES chunks(id),
         vec BLOB NOT NULL
       );
       CREATE TABLE IF NOT EXISTS user_events (
@@ -69,7 +70,17 @@ export class SqliteService {
         key TEXT PRIMARY KEY,
         vec BLOB NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS index_meta (
+        source_id TEXT PRIMARY KEY,
+        hash TEXT NOT NULL
+      );
     `);
+    // для БД, созданных до появления studied — ALTER молча падает на свежих
+    try {
+      this.db.run('ALTER TABLE chunks ADD COLUMN studied INTEGER NOT NULL DEFAULT 0');
+    } catch {
+      /* колонка уже есть */
+    }
   }
 
   exec(sql: string, params: unknown[] = []): Promise<Row[]> {
