@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -6,11 +6,12 @@ import { LlmClientService } from '../../services/llm-client.service';
 import { LlmConfig } from '../../models/journey.models';
 import { SqliteService } from '../../../core/sqlite.service';
 import { ReindexService } from '../../../core/reindex.service';
+import { ProgressAnalyzerComponent } from '../../components/progress-analyzer/progress-analyzer.component';
 
 @Component({
   selector: 'app-journey-settings',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ProgressAnalyzerComponent],
   template: `
     <div class="settings-page">
       <div class="settings-panel panel">
@@ -112,7 +113,15 @@ import { ReindexService } from '../../../core/reindex.service';
           </div>
         </div>
 
+        <div class="form-group">
+          <label>Прогресс</label>
+          <button class="provider-btn selected" (click)="analyzerModal.open()">
+            🔍 Анализ прогресса
+          </button>
+        </div>
+
         <div class="form-actions">
+          <app-progress-analyzer />
           <button class="btn btn-primary" (click)="save()">💾 Сохранить</button>
           <button class="btn btn-ghost" (click)="goBack()">← Назад</button>
         </div>
@@ -232,6 +241,8 @@ export class JourneySettingsComponent implements OnInit {
 
   reindexing = signal(false);
   reindexed: { chunks: number; time: number } | null = null;
+
+  @ViewChild(ProgressAnalyzerComponent) analyzerModal!: ProgressAnalyzerComponent;
 
   progress(): { done: number; total: number } | null {
     return this.reindexSvc.progress();

@@ -159,3 +159,21 @@ node server/index.js
 - __`EmbedderService.autoConfigure()`__ (вызывается из `reindexAll`) — есть конфиг эмбеддингов → переключается на `BackendEmbeddingProvider`. В интерфейсе `EmbeddingProvider` появился опциональный `embedBatch` — бэкенд умеет батч одним запросом, и `embedBatch()` идёт одним POST вместо пула из 4 воркеров.
 - __`proxy.conf.json`__ + `angular.json serve.options.proxyConfig` — при `ng serve` запросы `/api/*` идут на `localhost:3000` без CORS-боли.
 - Прямые провайдеры (`YandexEmbeddingProvider`, `OpenAIEmbeddingProvider`) остались — мобильный сценарий без бэкенда не сломан.
+
+__`src/app/core/rag.service.ts`__ — добавлен `search(query, k = 3)`: чистый retrieval (embed → cosine по всем векторам → top-k → `Source[]`), без LLM. `ask()` теперь использует его внутри — дублирования SQL не осталось. Заодно починил dot-доступ к `Row` в `toSource` (TS4111 в app-сборке).
+
+__`src/app/core/prompts/analyzer.prompts.ts`__:
+
+- `ANALYZER_SYSTEM_PROMPT` — «учебный аналитик, ТОЛЬКО валидный JSON»;
+- `buildAnalyzerPrompt(aggregates, goal?)` — агрегаты строками + цель юзера; в требовании заложено различение «слабая тема» (низкий score) и «мало данных» (низкая coverage при высокой correct_rate); жёсткий формат ответа с примером.
+
+__`src/app/core/progress-analyzer.service.ts`__ — `analyze(userGoal?)`:
+
+1. `getAggregates()`; пусто → честный summary «данных пока нет», LLM не дёргается.
+2. `llm.generateJson<AnalyzerLlmResponse>` — штатные ретраи + толерантный парсинг markdown, руками JSON не парсил.
+3. На каждую из 3 слабых тем — `rag.search(topic, 3)`, параллельно (`Promise.all`, эмбеддинги кэшированы).
+4. Статьи → человекочитаемые заголовки через `ARTICLES` (fallback: section/chunkId), дедуп.
+
+__UI__ — `journey/components/progress-analyzer/progress-analyzer.component.ts`: кнопка «🔍 Анализ прогресса» в journey-settings (рядом с «Обновить индекс»); модалка в стиле проекта (тёмная, золотые акценты): summary → карточки по темам (тема, reason «как мешает цели», список 📖 статей) → «Закрыть»; клик по оверлею тоже закрывает; ошибка LLM показывается внутри модалки, не падает в консоль молча.
+
+__Замечание:__ тема для `rag.search` — это имя из агрегатов, т.е. то, чем юзер (или твой код) пометил topicId в `trackEvent`. Если там сырые id вроде `tokens`, retrieval будет искать по ним — работает, но лучше человеческие названия тем.

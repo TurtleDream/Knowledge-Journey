@@ -1,27 +1,20 @@
 Журнал изменений
 
-2026-09-14 15:14 — v 3.0.1 Разделил Бэк и фронт
+2026-09-14 15:22 — v 3.0.2 Анализатор прогресса
 
-Область:  Backend | Frontend | Documentation
+Область:  Frontend | Documentation
 
 Что изменилось:
 
-    Разделил Бэк и фронт
-    Добавили settings.json
+    Добавлен анализатор прогресса, предлагает темы для изучения 
 
 Затронутые пути:
 
-    src/app/journey/services/llm-client.service.ts
-    src/app/core/settings.service.ts
-    src/app/core/reindex.service.ts
-    src/app/core/embedding-provider.ts
-    src/app/core/embedder.service.ts
-    server/settings.example.json
-    server/index.js
-    proxy.conf.json
-    package.json
-    package-lock.json
-    angular.json
+    src/app/journey/pages/journey-settings/journey-settings.component.ts
+    src/app/journey/components/progress-analyzer/progress-analyzer.component.ts
+    src/app/core/prompts/analyzer.prompts.ts
+    src/app/core/rag.service.ts
+    src/app/core/progress-analyzer.service.ts
 
 Зачем / контекст:
 

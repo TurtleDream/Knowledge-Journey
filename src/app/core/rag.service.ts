@@ -42,11 +42,11 @@ function blobToVec(blob: Uint8Array): number[] {
 
 function toSource(r: Row, score: number): Source {
   return {
-    chunkId: r.id as string,
-    articleId: r.article_id as string,
-    section: (r.section as string) || undefined,
-    text: r.text as string,
-    unstudied: !r.studied,
+    chunkId: r['id'] as string,
+    articleId: r['article_id'] as string,
+    section: (r['section'] as string) || undefined,
+    text: r['text'] as string,
+    unstudied: !r['studied'],
     score,
   };
 }
@@ -60,20 +60,7 @@ export class RagService {
   ) {}
 
   async ask(question: string, opts: { includeUnstudied: boolean }): Promise<RagResult> {
-    const qvec = await this.embedder.embed(question);
-
-    // векторов в БД обычно сотни-тысячи, целиком в память — ок для frontend-only
-    const rows = await this.db.exec(`
-      SELECT c.id, c.article_id, c.section, c.text, c.studied, e.vec
-      FROM chunks c JOIN embeddings e ON e.chunk_id = c.id
-    `);
-
-    const scored = rows
-      .map((r) => ({ r, score: cosine(qvec, blobToVec(r.vec as Uint8Array)) }))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, TOP_K);
-
-    const sources = scored.map((s) => toSource(s.r, s.score));
+    const sources = await this.search(question, TOP_K);
     if (sources.length === 0) {
       return { needsUnstudiedConfirm: false, answer: '', sources, origin: 'general' };
     }
@@ -97,6 +84,22 @@ export class RagService {
       sources: this.linkCitations(answer, sources),
       origin: general ? 'general' : 'platform',
     };
+  }
+
+  // чистый retrieval без LLM — для анализатора прогресса
+  async search(query: string, k = 3): Promise<Source[]> {
+    const qvec = await this.embedder.embed(query);
+
+    const rows = await this.db.exec(`
+      SELECT c.id, c.article_id, c.section, c.text, c.studied, e.vec
+      FROM chunks c JOIN embeddings e ON e.chunk_id = c.id
+    `);
+
+    return rows
+      .map((r) => ({ r, score: cosine(qvec, blobToVec(r['vec'] as Uint8Array)) }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, k)
+      .map((s) => toSource(s.r, s.score));
   }
 
   // citations [N] в ответе могут указывать на чанки, которые модель взяла
