@@ -16,8 +16,14 @@ export class SqliteService {
   private persistTimer: ReturnType<typeof setTimeout> | null = null;
 
   // wasmDir — относительный путь к каталогу с sql-wasm.wasm; в karma он другой
+  // провал init не кэшируется — следующий вызов пытается снова
   async init(wasmDir = 'assets/'): Promise<void> {
-    this.initPromise ??= this.doInit(wasmDir);
+    if (!this.initPromise) {
+      this.initPromise = this.doInit(wasmDir).catch((e) => {
+        this.initPromise = null;
+        throw e;
+      });
+    }
     return this.initPromise;
   }
 

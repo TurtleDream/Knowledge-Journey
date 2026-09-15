@@ -1,30 +1,37 @@
 # CONTEXT.md
 
-Проект: **Knowledge Journey** (Angular 17 standalone + локальный Node-бэкенд, деплой статики на GitHub Pages).
-Тематика: портал по промпт-инжинирингу в стилистике Diablo 2. Русскоязычный.
+Проект: **Knowledge Journey** — образовательный портал по промпт-инжинирингу.
+Фронтенд: Angular 17 standalone-компоненты, signals, zone.js.
+Бэкенд: Node + Express (прокси LLM, эмбеддинги, статика для деплоя).
+Деплой: GitHub Pages (статика из `ng build`).
 
 ## Стек
 
-- Angular 17.3, standalone-компоненты, signals, зона change detection по умолчанию
-- TypeScript, Karma + Jasmine (headless через Edge: `CHROME_BIN=msedge`, Chrome не установлен)
-- sql.js (SQLite в браузере, WASM в `src/assets/sql-wasm.wasm` + `sql-wasm-browser.wasm` — оба нужны) + IndexedDB для persist
-- Бэкенд: Node + Express + cors (`server/index.js`), без TS
-- html2canvas, jspdf
+- Angular 17.3, standalone-компоненты, `signal`/`computed`, zone.js
+- TypeScript 5.4, Karma + Jasmine (headless Edge: `CHROME_BIN=msedge`)
+- sql.js (SQLite в браузере, WASM из `src/assets/`) + IndexedDB для persist
+- Бэкенд: `server/index.js` (Express 5, cors, без TS)
+- html2canvas, jspdf (экспорт отчётов)
+- `@angular/cli` + `angular-cli-ghpages` для деплоя
 
 ## Фронтенд / бэкенд
 
-Бэкенд — локальный (`node server/index.js`, порт из настроек):
-- `GET /api/config` — содержимое `server/settings.json` (файл читается на каждый запрос — правки без рестарта)
+Бэкенд локальный (`node server/index.js`, порт из `server/settings.json`):
+- `GET /api/health` — проверка работы
+- `GET /api/config` — содержимое `server/settings.json` (читание на каждый запрос, правки без рестарта)
 - `POST /api/llm` `{prompt, systemPrompt}` → `{text}` — прокси к LLM-провайдеру
 - `POST /api/embeddings` `{texts}` → `{embeddings}` — прокси к Yandex text-embedding
-- раздаёт статику из `server/dist` (вариант прода: `ng build` → туда)
+- `POST /api/analyze` — анализ прогресса (слабые темы, рекомендации)
+- `POST /api/recommend` — рекомендации (nextTopics, relatedSkills, resumeSuggestion)
+- `express.static` из `server/dist` — для прода-деплоя
 
 Настройки — **в файле**, не в коде: `server/settings.json` (в .gitignore), шаблон `server/settings.example.json`:
-`port`, `llm {provider, apiKey, model, apiUrl}`, `embeddings {iamToken, folderId, kind}`.
+`port`, `llm {provider, apiKey, model, apiUrl, folderId}`, `embeddings {apiKey, iamToken, folderId, kind}`.
 
 Фронтенд: `SettingsService.load()` → `/api/config` (кэшируется, `null` если бэкенд не поднят).
-- LLM: `LlmClientService.generate` — бэкенд в приоритете; **ошибка бэкенда пробрасывается** (фолбэк на localStorage-ключи только если бэкенда нет вообще).
-- Эмбеддинги: `EmbedderService.autoConfigure()` (зову из `reindexAll`) — есть конфиг → `BackendEmbeddingProvider`.
+- `apiBase()` — относительный путь на localhost, `http://localhost:3000` иначе; переопределить через `localStorage.kj-api-base`.
+- LLM: `LlmClientService` — бэкенд в приоритете; ошибка бэкенда пробрасывается (фолбэк на localStorage-ключи только если бэкенда нет и нет сети).
+- Эмбеддинги: `EmbedderService.autoConfigure()` → `BackendEmbeddingProvider` если есть конфиг, иначе Yandex (прямой, ключ в браузере — только для разработки).
 - `ng serve` проксирует `/api/*` через `proxy.conf.json` (прописан в angular.json serve.options).
 
 ## Архитектура: RAG-слой (`src/app/core/`)
@@ -47,13 +54,44 @@
    Формула mastery: `0.6*correct_rate + 0.2*recency + 0.2*coverage`; recency = `0.5^(Δt/24ч)` (полураспад сутки), coverage = `min(1, answered/10)`.
 8. **settings.service.ts** — см. «Фронтенд / бэкенд».
 
-## Контент и приложение
+## Контент (`src/app/content/`)
 
-- `src/app/content/` — статьи (`ARTICLES: Article[]`, секции с абзацами и inline-упражнениями) и тест (`TEST_QUESTIONS: ExerciseData[]`, mode 'test').
-- `src/app/core/exercise-types.ts` — 10 типов упражнений, унифицированный `ExerciseData`.
-- `src/app/exercises/` — по компоненту на тип + exercise-host.
-- `src/app/journey/` — генерация «путешествий» через LLM: journey-generator / evaluation / llm-client / journey-state. Ключ: бэкенд (settings.json) или localStorage (настройки journey-settings).
-- `src/app/pages/` — home, article, test, results.
+- `articles.data.ts` — `ARTICLES: Article[]` (5 статей, 1500–2500 слов каждая).
+  Каждая статья: id, title, subtitle, icon, level, readTime, tags, sections.
+  Секция: heading?, paragraphs[], exercises? (интерактивные упражнения после абзацев).
+  Статьи: «Как работают LLM», «Галлюцинации», «Структура эффективного промпта», «Безопасность», «Токены и лимиты контекста».
+- `test-questions.data.ts` — `TEST_QUESTIONS: ExerciseData[]` (12 вопросов, mode: 'test').
+
+## Упражнения (`src/app/exercises/`)
+
+10 типов, унифицированный `ExerciseData` (см. `core/exercise-types.ts`):
+1. **multiple-choice** — выбор одного/нескольких вариантов, частичный балл.
+2. **match-pairs** — соедини пары (левый → правый индекс), инкрементальное соединение.
+3. **fill-the-blank** — заполни пропуск (`___`), синонимы, case-sensitive опционально.
+4. **true-false** — верно/неверно.
+5. **order-steps** — порядок шагов (перемешивание + drag-to-position).
+6. **case-study** — улучши промпт: автооценка по ключевым элементам + самооценка 1–5, итог = среднее.
+7. **prompt-simulator** — напиши промпт для заданного ответа AI: автооценка по ключевым словам + самооценка.
+8. **spot-the-hallucination** — выдели галлюцинацию в тексте (клики по словам, диапазон `[start, end]`).
+9. **prompt-builder** — собери промпт из блоков в правильном порядке (drag-to-order).
+10. **prompt-battle** — выбери лучший из двух промптов + объяснение.
+
+Базовый класс: `ExerciseBase` (abstract component) — состояния idle/correct/incorrect/partial/answered, `@Input() data`, `@Output() result`.
+Хост: `ExerciseHostComponent` — динамическая загрузка компонента по `data.type`, прокидывает результат наверх.
+Обратная связь: `ExerciseFeedbackComponent` — статус + объяснение.
+
+## AI-слой (`src/app/ai/`)
+
+- **ai-chat-button** — FAB (дロワブル-кнопка справа внизу): свиток с глазом, бейдж «новые рекомендации» = слабые темы (score < 0.5).
+- **ai-chat-panel** — панель чата «Оракул»:
+  - RAG-ответы с цитатами `[N]`, маркером «На основе платформы» / «Общие знания».
+  - Чипы быстрого вызова: «📊 Анализ прогресса», «🎯 Рекомендации», «⚔ Тренировка по изученному».
+  - Прогресс (слабые темы, рекомендации) — сразу в чат, без модалки.
+  - Тренировка: `ChatJourneyService` — вопросы только по изученному, ответ → оценка LLM → событие в mastery.
+  - Тогл «Поиск по изученному» — фильтр `onlyStudied` в RAG.
+- **recommendations-modal** — модалка рекомендаций (nextTopics, relatedSkills, resumeSuggestion).
+- **ai/pages/ai.component** — tab-страница: Чат, Анализ прогресса, Рекомендации, Генератор Journey.
+- **progress-analyzer** — модалка анализа (слабые темы + рекомендации с артиклами).
 
 ## Тестирование
 

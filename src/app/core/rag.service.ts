@@ -87,7 +87,8 @@ export class RagService {
   }
 
   // чистый retrieval без LLM — для анализатора и генератора journey
-  // onlyStudied — только чанки, помеченные studied (markStudied)
+  // onlyStudied — только чанки, помеченные studied. Фильтр в SQL, ДО отсечения
+  // top-k: иначе изученные чанки вытесняются неизученными из топа и поиск пустеет
   async search(
     query: string,
     k = 3,
@@ -98,14 +99,14 @@ export class RagService {
     const rows = await this.db.exec(`
       SELECT c.id, c.article_id, c.section, c.text, c.studied, e.vec
       FROM chunks c JOIN embeddings e ON e.chunk_id = c.id
+      ${opts.onlyStudied ? 'WHERE c.studied = 1' : ''}
     `);
 
     return rows
       .map((r) => ({ r, score: cosine(qvec, blobToVec(r['vec'] as Uint8Array)) }))
       .sort((a, b) => b.score - a.score)
       .slice(0, k)
-      .map((s) => toSource(s.r, s.score))
-      .filter((s) => (opts.onlyStudied ? !s.unstudied : true));
+      .map((s) => toSource(s.r, s.score));
   }
 
   // citations [N] в ответе могут указывать на чанки, которые модель взяла

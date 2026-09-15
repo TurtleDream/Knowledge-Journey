@@ -8,6 +8,7 @@
 import { Injectable } from '@angular/core';
 
 import { SettingsService } from '../../core/settings.service';
+import { apiBase } from '../../core/api-base';
 import { LlmConfig } from '../models/journey.models';
 
 const CONFIG_KEY = 'kj-llm-config';
@@ -42,7 +43,7 @@ export class LlmClientService {
     // сначала пробуем локальный бэкенд — ключи не светятся в браузере
     const cfg = await this.settings.load();
     if (cfg?.llm?.apiKey) {
-      const res = await fetch('/api/llm', {
+      const res = await fetch(`${apiBase()}/api/llm`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt, systemPrompt }),

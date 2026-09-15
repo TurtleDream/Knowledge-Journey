@@ -60,6 +60,17 @@ export class ReindexService {
     const h = hash ?? (await hashStr(articleContent(article)));
     const chunks = this.chunker.chunkArticle(article);
 
+    // изученность статьи — свойство пользователя, а не контента: при переиндексации
+    // сохраняем её (иначе «Обновить индекс» стирает отметки «Я изучил»)
+    const studiedRows = await this.db.exec(
+      'SELECT studied FROM chunks WHERE article_id = ? LIMIT 1',
+      [article.id],
+    );
+    const wasStudied = studiedRows.length > 0 && !!studiedRows[0]['studied'];
+    for (const c of chunks) {
+      if (wasStudied) c.meta.studied = true;
+    }
+
     // старые чанки статьи сносим целиком, idx могли поехать
     await this.db.run('DELETE FROM embeddings WHERE chunk_id LIKE ?', [`${article.id}:%`]);
     await this.db.run('DELETE FROM chunks WHERE article_id = ?', [article.id]);

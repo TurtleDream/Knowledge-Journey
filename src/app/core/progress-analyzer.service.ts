@@ -1,5 +1,7 @@
 import { Injectable } from '@angular/core';
 
+import { apiBase } from './api-base';
+
 import { ARTICLES } from '../content/articles.data';
 import { LlmClientService } from '../journey/services/llm-client.service';
 import { UserContextService, TopicMastery } from './user-context.service';
@@ -46,10 +48,33 @@ export class ProgressAnalyzerService {
       };
     }
 
-    const llmRes = await this.llm.generateJson<AnalyzerLlmResponse>(
-      buildAnalyzerPrompt(aggregates.map(toPromptAggregate), userGoal),
-      ANALYZER_SYSTEM_PROMPT,
-    );
+    // приоритет — бэкенд: промпты и ключ живут на сервере
+    let llmRes: AnalyzerLlmResponse;
+    try {
+      const r = await fetch(`${apiBase()}/api/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          aggregates: aggregates.map((a) => ({ topic: a.topic, score: a.score, correctRate: a.correctRate, coverage: a.coverage })),
+          goal: userGoal,
+        }),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({ error: r.statusText }));
+        throw new Error(err.error ?? `backend analyze error ${r.status}`);
+      }
+      llmRes = (await r.json()) as AnalyzerLlmResponse;
+    } catch (e) {
+      // сеть/нет бэкенда — старый путь через LlmClientService
+      if (/Failed to fetch|NetworkError|load failed/i.test(String(e))) {
+        llmRes = await this.llm.generateJson<AnalyzerLlmResponse>(
+          buildAnalyzerPrompt(aggregates.map(toPromptAggregate), userGoal),
+          ANALYZER_SYSTEM_PROMPT,
+        );
+      } else {
+        throw e;
+      }
+    }
 
     const byTopic = new Map(aggregates.map((a) => [a.topic, a]));
     const weakTopics: Topic[] = llmRes.weakTopics.map((w) => ({

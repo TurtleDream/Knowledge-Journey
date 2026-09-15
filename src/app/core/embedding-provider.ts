@@ -1,3 +1,5 @@
+import { apiBase } from './api-base';
+
 // Абстракция поверх конкретного провайдера эмбеддингов — чтобы переключиться
 // на OpenAI, достаточно реализовать этот интерфейс и подсунуть в EmbedderService.
 export interface EmbeddingProvider {
@@ -13,7 +15,7 @@ export class BackendEmbeddingProvider implements EmbeddingProvider {
   }
 
   async embedBatch(texts: string[]): Promise<number[][]> {
-    const res = await fetch('/api/embeddings', {
+    const res = await fetch(`${apiBase()}/api/embeddings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ texts }),
@@ -33,7 +35,7 @@ export class BackendEmbeddingProvider implements EmbeddingProvider {
 // у Яндекса это разные модели, смешивать нельзя.
 export class YandexEmbeddingProvider implements EmbeddingProvider {
   private static readonly URL =
-    'https://llm.api.cloud.yandex.net/foundation-models/v1/text-embedding';
+    'https://llm.api.cloud.yandex.net/foundationModels/v1/textEmbedding';
 
   constructor(
     private iamToken: string,

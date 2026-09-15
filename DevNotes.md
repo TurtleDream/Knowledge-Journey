@@ -1,5 +1,50 @@
 Журнал изменений
 
+2026-09-15 16:46 — v 3.1.0 Обновление UI
+
+Область:  Frontend | Backand | Documentation
+
+Что изменилось:
+
+    Добавлен пункт "Оракул для работы с AI"
+    Добавлен чат для работы с AI
+    Добавлены функциональности для генерация journey на основе изученной базы
+    В чат и оракула встроенны рекомендации по изучению и анализ прогресса
+
+Затронутые пути:
+
+    src/app/pages/article/article.component.ts
+    src/app/journey/services/llm-client.service.ts
+    src/app/journey/services/journey-generator.service.ts
+    src/app/journey/pages/journey-input/journey-input.component.ts
+    src/app/journey/components/progress-analyzer/progress-analyzer.component.ts
+    src/app/core/prompts/trainer.prompts.ts
+    src/app/core/sqlite.service.ts
+    src/app/core/settings.service.ts
+    src/app/core/reindex.service.ts
+    src/app/core/recommender.service.ts
+    src/app/core/rag.service.ts
+    src/app/core/progress-analyzer.service.ts
+    src/app/core/embedding-provider.ts
+    src/app/core/embedder.service.ts
+    src/app/core/chat-journey.service.ts
+    src/app/core/api-base.ts
+    src/app/ai/pages/ai/ai.component.ts
+    src/app/ai/components/recommendations-modal/recommendations-modal.component.ts
+    src/app/ai/components/ai-chat-panel/ai-chat-panel.component.ts
+    src/app/ai/components/ai-chat-button/ai-chat-button.component.ts
+    src/app/app.routes.ts
+    src/app/app.config.ts
+    src/app/app.component.ts
+    server/start-all.js
+    server/index.js
+    start-all.bat
+    package.json
+
+Зачем / контекст:
+
+    Финализация функционала
+
 2026-09-14 15:47 — v 3.0.4 Генератор Journey через RAG
 
 Область:  Frontend | Documentation
@@ -139,7 +184,7 @@
 
     Формирование основы для RAG
 
-2026-09-14 13:44 — Добавление Chunker 
+2026-09-14 13:44 — Добавление Chunker
 
 Область:  Backend | Documentation
 
@@ -155,6 +200,7 @@
 Зачем / контекст:
 
     Формирование основы
+
 
 2026-09-14 13:36 — SQLite + sql.js в Angular
 

@@ -9,7 +9,7 @@ import { ProgressAnalyzerService, ProgressAnalysis } from '../../../core/progres
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="overlay" (click)="close()">
+    <div class="overlay" *ngIf="visible()" (click)="close()">
       <div class="modal" (click)="$event.stopPropagation()">
         <h2>⚔ Анализ прогресса</h2>
 
@@ -55,6 +55,7 @@ import { ProgressAnalyzerService, ProgressAnalysis } from '../../../core/progres
   `],
 })
 export class ProgressAnalyzerComponent {
+  visible = signal(false);
   loading = signal(false);
   result = signal<ProgressAnalysis | null>(null);
   error = signal<string | null>(null);
@@ -65,6 +66,7 @@ export class ProgressAnalyzerComponent {
   ) {}
 
   async open(): Promise<void> {
+    this.visible.set(true);
     this.result.set(null);
     this.error.set(null);
     this.loading.set(true);
@@ -79,6 +81,7 @@ export class ProgressAnalyzerComponent {
   }
 
   close(): void {
+    this.visible.set(false);
     this.result.set(null);
     this.error.set(null);
   }

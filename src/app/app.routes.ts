@@ -42,6 +42,10 @@ export const routes: Routes = [
     loadComponent: () => import('./journey/pages/journey-report/journey-report.component').then(m => m.JourneyReportComponent),
   },
   {
+    path: 'ai',
+    loadComponent: () => import('./ai/pages/ai/ai.component').then(m => m.AiComponent),
+  },
+  {
     path: '**',
     redirectTo: '',
   },

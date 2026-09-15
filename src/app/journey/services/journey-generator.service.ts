@@ -7,6 +7,7 @@
 import { Injectable } from '@angular/core';
 import { LlmClientService } from './llm-client.service';
 import { RagService } from '../../core/rag.service';
+import { UserContextService } from '../../core/user-context.service';
 import {
   Activity,
   Checkpoint,
@@ -40,7 +41,24 @@ export class JourneyGeneratorService {
   constructor(
     private llm: LlmClientService,
     private rag: RagService,
+    private ctx: UserContextService,
   ) {}
+
+  /**
+   * Тема для journey на основе изученного: берём слабые темы из агрегатов
+   * (низкий score — туда и надо расти) и составляем тему из 2-3 верхних.
+   * Нет агрегатов — null, caller просит ввести тему руками.
+   */
+  async suggestTopicFromProgress(): Promise<string | null> {
+    const agg = await this.ctx.getAggregates();
+    if (agg.length === 0) return null;
+    const weakest = agg
+      .slice()
+      .sort((a, b) => a.score - b.score)
+      .slice(0, 3)
+      .map((a) => a.topic);
+    return weakest.join(' + ');
+  }
 
   /** Полная генерация journey на основе изученных материалов */
   async generateJourney(request: JourneyRequest): Promise<JourneyGeneration> {

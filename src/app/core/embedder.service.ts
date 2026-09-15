@@ -41,7 +41,9 @@ export class EmbedderService {
   // ключи остаются в server/settings.json. Прямые провайдеры — фолбэк.
   async autoConfigure(): Promise<void> {
     const cfg = await this.settings.load();
-    if (cfg?.embeddings?.iamToken) {
+    const emb = cfg?.embeddings;
+    // ключ может быть в apiKey (Api-Key) или iamToken (Bearer) — оба варианта валидны
+    if (emb && (emb.apiKey || emb.iamToken)) {
       this.provider = new BackendEmbeddingProvider();
     }
   }

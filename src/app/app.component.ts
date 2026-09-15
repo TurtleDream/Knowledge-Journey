@@ -2,10 +2,14 @@ import { Component } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { CommonModule } from '@angular/common';
 
+import { AiChatButtonComponent } from './ai/components/ai-chat-button/ai-chat-button.component';
+import { AiChatPanelComponent } from './ai/components/ai-chat-panel/ai-chat-panel.component';
+
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, AiChatButtonComponent, AiChatPanelComponent],
+
   template: `
     <div class="app-shell">
       <header class="app-header">
@@ -22,6 +26,7 @@ import { CommonModule } from '@angular/common';
             <a routerLink="/test" routerLinkActive="active">Тест</a>
             <a routerLink="/results" routerLinkActive="active">Результаты</a>
             <a routerLink="/journey" routerLinkActive="active">Путешествие</a>
+            <a routerLink="/ai" routerLinkActive="active">Оракул</a>
           </nav>
         </div>
       </header>
@@ -29,6 +34,9 @@ import { CommonModule } from '@angular/common';
       <main class="app-main">
         <router-outlet></router-outlet>
       </main>
+
+      <app-ai-chat-button (open)="chatOpen = true"></app-ai-chat-button>
+      <app-ai-chat-panel [open]="chatOpen" (closed)="chatOpen = false"></app-ai-chat-panel>
 
       <footer class="app-footer">
         <div class="footer-inner">
@@ -121,4 +129,6 @@ import { CommonModule } from '@angular/common';
     }
   `]
 })
-export class AppComponent {}
+export class AppComponent {
+  chatOpen = false;
+}

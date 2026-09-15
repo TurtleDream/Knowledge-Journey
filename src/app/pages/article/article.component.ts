@@ -3,6 +3,8 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ARTICLES, Article } from '../../content/articles.data';
 import { ExerciseHostComponent } from '../../exercises/exercise-host/exercise-host.component';
+import { ReindexService } from '../../core/reindex.service';
+import { UserContextService } from '../../core/user-context.service';
 
 @Component({
   selector: 'app-article',
@@ -42,6 +44,10 @@ import { ExerciseHostComponent } from '../../exercises/exercise-host/exercise-ho
       <div class="rune-divider">ᚱ ᚢ ᚾ ᛖ</div>
 
       <div class="article-next">
+        <button class="btn btn-study" *ngIf="!marked" (click)="markStudied()" [disabled]="marking">
+          {{ marking ? 'Сохраняю…' : '✓ Я изучил эту статью' }}
+        </button>
+        <span class="marked-ok" *ngIf="marked">✓ Засчитано в прогрессе</span>
         <a routerLink="/test" class="btn btn-primary">Проверить знания в тесте →</a>
       </div>
     </div>
@@ -80,7 +86,12 @@ import { ExerciseHostComponent } from '../../exercises/exercise-host/exercise-ho
       margin: 0 0 16px;
     }
     .inline-exercise { margin: 8px 0 24px; }
-    .article-next { text-align: center; padding: 20px 0; }
+    .article-next { text-align: center; padding: 20px 0; display: flex; gap: 12px; justify-content: center; align-items: center; flex-wrap: wrap; }
+    .btn-study { padding: 10px 24px; background: rgba(95,201,111,0.15); color: #5fc96f;
+      border: 1px solid #3f9b4f; border-radius: 4px; cursor: pointer; font-size: 14px; }
+    .btn-study:hover { background: rgba(95,201,111,0.3); }
+    .btn-study:disabled { opacity: 0.5; cursor: default; }
+    .marked-ok { color: #5fc96f; font-size: 13px; }
     .not-found { text-align: center; padding: 60px 20px; }
     .not-found h2 { color: #e08a80; }
 
@@ -91,13 +102,40 @@ import { ExerciseHostComponent } from '../../exercises/exercise-host/exercise-ho
 })
 export class ArticleComponent implements OnInit {
   article: Article | null = null;
+  marked = false;
+  marking = false;
 
-  constructor(private route: ActivatedRoute) {}
+  constructor(
+    private route: ActivatedRoute,
+    private reindex: ReindexService,
+    private ctx: UserContextService,
+  ) {}
 
   ngOnInit(): void {
     this.route.paramMap.subscribe(params => {
       const id = params.get('id');
       this.article = ARTICLES.find(a => a.id === id) ?? null;
+      this.marked = false;
     });
+  }
+
+  // изученность нужна RAG-фильтру (onlyStudied), событие — формуле mastery
+  async markStudied(): Promise<void> {
+    if (!this.article || this.marking) return;
+    this.marking = true;
+    try {
+      await this.reindex.markStudied(this.article.id);
+      // тема = первый тег статьи; чтение засчитываем как освоение
+      await this.ctx.trackEvent({
+        type: 'article-opened',
+        topicId: this.article.tags[0] ?? this.article.title,
+        correct: true,
+      });
+      this.marked = true;
+    } catch (e) {
+      console.error('markStudied failed', e);
+    } finally {
+      this.marking = false;
+    }
   }
 }

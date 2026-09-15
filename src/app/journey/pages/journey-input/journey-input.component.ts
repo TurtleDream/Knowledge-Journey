@@ -70,8 +70,13 @@ import { Difficulty, NarrativeMode } from '../../models/journey.models';
           >
             {{ loading ? 'Генерация...' : '⚔ Начать путешествие' }}
           </button>
+          <button class="btn btn-ghost" (click)="suggestFromProgress()" [disabled]="suggesting">
+            {{ suggesting ? 'Смотрю прогресс…' : '🎯 Тема по моему прогрессу' }}
+          </button>
           <button class="btn btn-ghost" (click)="openSettings()">⚙ Настройки API</button>
         </div>
+
+        <div class="hint" *ngIf="suggestError">{{ suggestError }}</div>
 
         <div class="error-box" *ngIf="error">
           <span class="error-icon">⚠</span>
@@ -95,6 +100,7 @@ import { Difficulty, NarrativeMode } from '../../models/journey.models';
     </div>
   `,
   styles: [`
+    .hint { font-size: 12px; color: #a89f8c; margin-top: 10px; text-align: center; }
     .journey-input { max-width: 800px; margin: 0 auto; }
     .input-panel { padding: 32px; }
     .input-title {
@@ -301,4 +307,26 @@ export class JourneyInputComponent {
 
   // изученного мало — список статей, которые стоит пройти сначала
   needStudy: { title: string; url: string; section?: string }[] | null = null;
+
+  suggesting = false;
+  suggestError = '';
+
+  // тема из слабых тем прогресса — journey растёт туда, где провисает
+  async suggestFromProgress(): Promise<void> {
+    if (this.suggesting) return;
+    this.suggesting = true;
+    this.suggestError = '';
+    try {
+      const topic = await this.generator.suggestTopicFromProgress();
+      if (!topic) {
+        this.suggestError = 'Прогресса пока нет: пройди тест или отметь статьи как изученные.';
+        return;
+      }
+      this.topic = topic;
+    } catch (e) {
+      this.suggestError = e instanceof Error ? e.message : 'Не удалось получить прогресс';
+    } finally {
+      this.suggesting = false;
+    }
+  }
 }

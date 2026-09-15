@@ -1,5 +1,7 @@
 import { Injectable } from '@angular/core';
 
+import { apiBase } from './api-base';
+
 import { ARTICLES } from '../content/articles.data';
 import { LlmClientService } from '../journey/services/llm-client.service';
 import { JourneyStateService } from '../journey/services/journey-state.service';
@@ -41,10 +43,29 @@ export class RecommenderService {
     const studied = aggregates.map((a: TopicMastery) => ({ topic: a.topic, score: a.score }));
     const journey = this.journeyState.journey();
 
-    const res = await this.llm.generateJson<RecommenderLlmResponse>(
-      buildRecommenderPrompt(studied, journey?.title ?? null, userGoal),
-      RECOMMENDER_SYSTEM_PROMPT,
-    );
+    // приоритет — бэкенд; ошибка сети = старый путь через LlmClientService
+    let res: RecommenderLlmResponse;
+    try {
+      const r = await fetch(`${apiBase()}/api/recommend`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studied, journeyTitle: journey?.title ?? null, goal: userGoal }),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({ error: r.statusText }));
+        throw new Error(err.error ?? `backend recommend error ${r.status}`);
+      }
+      res = (await r.json()) as RecommenderLlmResponse;
+    } catch (e) {
+      if (/Failed to fetch|NetworkError|load failed/i.test(String(e))) {
+        res = await this.llm.generateJson<RecommenderLlmResponse>(
+          buildRecommenderPrompt(studied, journey?.title ?? null, userGoal),
+          RECOMMENDER_SYSTEM_PROMPT,
+        );
+      } else {
+        throw e;
+      }
+    }
 
     // параллельный retrieval по каждой следующей теме
     const nextTopics = await Promise.all(
